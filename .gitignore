@@ -1,0 +1,75 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+.Python
+build/
+dist/
+.eggs/
+*.egg-info/
+*.egg
+
+# Virtual Environment
+venv/
+env/
+.venv/
+ENV/
+
+# =========================
+# Environment variables (secrets)
+# =========================
+.env
+.env.*
+*.env
+
+# =========================
+# Logs
+# =========================
+*.log
+logs/
+
+# =========================
+# IDE / Editor
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+*.DS_Store
+
+# =========================
+# Testing / Coverage
+# =========================
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+
+# =========================
+# Docker
+# =========================
+docker-compose.override.yml
+*.tar
+
+# =========================
+# Node (if Railway CLI used)
+# =========================
+node_modules/
+npm-debug.log*
+
+# =========================
+# Misc
+# =========================
+.cache/
+tmp/
+*.sqlite3
+*.db
+
+# =========================
+# OS
+# =========================
+Thumbs.db

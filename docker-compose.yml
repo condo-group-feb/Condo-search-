@@ -1,0 +1,9 @@
+services:
+  api:
+    build: .
+    container_name: bolt_bot_api
+    env_file:
+      - .env
+    ports:
+      - "8080:8000"
+    restart: unless-stopped
