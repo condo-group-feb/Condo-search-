@@ -19,12 +19,6 @@ env/
 .venv/
 ENV/
 
-# =========================
-# Environment variables (secrets)
-# =========================
-.env
-.env.*
-*.env
 
 # =========================
 # Logs
