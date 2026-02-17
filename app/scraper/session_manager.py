@@ -99,18 +99,46 @@ class SessionManager:
                 "Chrome/120.0.0.0 Safari/537.36"
             )
             
-            # Try to use system chromium if available (for Docker)
-            try:
-                import os
-                if os.path.exists("/usr/bin/chromium"):
-                    options.binary_location = "/usr/bin/chromium"
-            except:
-                pass
+            # Try to use system chromium if available (for Docker/Railway)
+            import os
+            if os.path.exists("/usr/bin/chromium"):
+                options.binary_location = "/usr/bin/chromium"
             
-            # Use ChromeDriverManager to automatically download and manage driver
-            # service = Service(ChromeDriverManager().install())
-            service = Service("/usr/bin/chromedriver")
-            driver = webdriver.Chrome(service=service, options=options)
+            # Try ChromeDriverManager first, fallback to system chromedriver for Railway
+            service = None
+            try:
+                # Try ChromeDriverManager (works in local, may fail on Railway due to network)
+                logger.info("Attempting to use ChromeDriverManager...")
+                service = Service(ChromeDriverManager().install())
+                logger.info("ChromeDriverManager installed successfully")
+            except Exception as wdm_error:
+                logger.warning(f"ChromeDriverManager failed: {wdm_error}, trying system chromedriver...")
+                # Fallback to system chromedriver (for Railway/Docker)
+                chromedriver_paths = [
+                    "/usr/bin/chromedriver",
+                    "/usr/local/bin/chromedriver",
+                    "/app/.chromedriver/bin/chromedriver"
+                ]
+                
+                chromedriver_path = None
+                for path in chromedriver_paths:
+                    if os.path.exists(path):
+                        chromedriver_path = path
+                        logger.info(f"Found system chromedriver at: {chromedriver_path}")
+                        break
+                
+                if chromedriver_path:
+                    service = Service(chromedriver_path)
+                else:
+                    raise SessionError(
+                        f"Could not find chromedriver. ChromeDriverManager failed: {wdm_error}, "
+                        f"and system chromedriver not found in: {chromedriver_paths}"
+                    )
+
+            driver = webdriver.Chrome(
+                service=service,
+                options=options
+            )
             
             # Set timeouts
             driver.implicitly_wait(10)
