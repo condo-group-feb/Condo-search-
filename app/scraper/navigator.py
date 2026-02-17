@@ -563,51 +563,72 @@ class Navigator:
             print("[NAV] Configuring search filters...")
             time.sleep(2)  # Wait for page to fully load
             
+            # Wait longer for page to fully load and form to be ready
+            print("[NAV] Waiting for form to be ready...")
+            time.sleep(3)
+            
             # Step 1: Uncheck Active, Coming Soon, Active With Contract
+            # Make these optional - if not found, continue anyway
             print("[NAV] Step 1: Unchecking Active, Coming Soon, Active With Contract...")
             
-            # Uncheck Active (value="101")
-            active_checkbox = self._find_element_with_fallback([
-                (By.XPATH, "//input[@type='checkbox' and @value='101' and @name='Fm11_Ctrl27_LB']"),
-                (By.XPATH, "//input[@type='checkbox' and @value='101' and contains(@data-mtx-track, 'Active')]"),
-                (By.CSS_SELECTOR, "input[value='101'][name='Fm11_Ctrl27_LB']"),
-            ])
-            if active_checkbox.is_selected():
-                print("[NAV] Unchecking Active checkbox...")
-                active_checkbox.click()
-                time.sleep(0.5)
-                print("[NAV] ✓ Active unchecked")
+            # Uncheck Active (value="101") - make it optional
+            try:
+                active_checkbox = self._find_element_with_fallback([
+                    (By.XPATH, "//input[@type='checkbox' and @value='101' and @name='Fm11_Ctrl27_LB']"),
+                    (By.XPATH, "//input[@type='checkbox' and @value='101' and contains(@data-mtx-track, 'Active')]"),
+                    (By.CSS_SELECTOR, "input[value='101'][name='Fm11_Ctrl27_LB']"),
+                    (By.XPATH, "//input[@type='checkbox' and @value='101']"),
+                ])
+                if active_checkbox and active_checkbox.is_selected():
+                    print("[NAV] Unchecking Active checkbox...")
+                    active_checkbox.click()
+                    time.sleep(0.5)
+                    print("[NAV] ✓ Active unchecked")
+            except Exception as e:
+                print(f"[NAV] ⚠ Could not find/uncheck Active checkbox: {e}")
+                logger.warning(f"Could not find Active checkbox: {e}")
             
-            # Uncheck Coming Soon (value="30647")
-            coming_soon_checkbox = self._find_element_with_fallback([
-                (By.XPATH, "//input[@type='checkbox' and @value='30647' and @name='Fm11_Ctrl27_LB']"),
-                (By.XPATH, "//input[@type='checkbox' and @value='30647' and contains(@data-mtx-track, 'Coming Soon')]"),
-                (By.CSS_SELECTOR, "input[value='30647'][name='Fm11_Ctrl27_LB']"),
-            ])
-            if coming_soon_checkbox.is_selected():
-                print("[NAV] Unchecking Coming Soon checkbox...")
-                coming_soon_checkbox.click()
-                time.sleep(0.5)
-                print("[NAV] ✓ Coming Soon unchecked")
+            # Uncheck Coming Soon (value="30647") - make it optional
+            try:
+                coming_soon_checkbox = self._find_element_with_fallback([
+                    (By.XPATH, "//input[@type='checkbox' and @value='30647' and @name='Fm11_Ctrl27_LB']"),
+                    (By.XPATH, "//input[@type='checkbox' and @value='30647' and contains(@data-mtx-track, 'Coming Soon')]"),
+                    (By.CSS_SELECTOR, "input[value='30647'][name='Fm11_Ctrl27_LB']"),
+                    (By.XPATH, "//input[@type='checkbox' and @value='30647']"),
+                ])
+                if coming_soon_checkbox and coming_soon_checkbox.is_selected():
+                    print("[NAV] Unchecking Coming Soon checkbox...")
+                    coming_soon_checkbox.click()
+                    time.sleep(0.5)
+                    print("[NAV] ✓ Coming Soon unchecked")
+            except Exception as e:
+                print(f"[NAV] ⚠ Could not find/uncheck Coming Soon checkbox: {e}")
+                logger.warning(f"Could not find Coming Soon checkbox: {e}")
             
-            # Uncheck Active With Contract (value="21505")
-            active_with_contract_checkbox = self._find_element_with_fallback([
-                (By.XPATH, "//input[@type='checkbox' and @value='21505' and @name='Fm11_Ctrl27_LB']"),
-                (By.XPATH, "//input[@type='checkbox' and @value='21505' and contains(@data-mtx-track, 'Active With Contract')]"),
-                (By.CSS_SELECTOR, "input[value='21505'][name='Fm11_Ctrl27_LB']"),
-            ])
-            if active_with_contract_checkbox.is_selected():
-                print("[NAV] Unchecking Active With Contract checkbox...")
-                active_with_contract_checkbox.click()
-                time.sleep(0.5)
-                print("[NAV] ✓ Active With Contract unchecked")
+            # Uncheck Active With Contract (value="21505") - make it optional
+            try:
+                active_with_contract_checkbox = self._find_element_with_fallback([
+                    (By.XPATH, "//input[@type='checkbox' and @value='21505' and @name='Fm11_Ctrl27_LB']"),
+                    (By.XPATH, "//input[@type='checkbox' and @value='21505' and contains(@data-mtx-track, 'Active With Contract')]"),
+                    (By.CSS_SELECTOR, "input[value='21505'][name='Fm11_Ctrl27_LB']"),
+                    (By.XPATH, "//input[@type='checkbox' and @value='21505']"),
+                ])
+                if active_with_contract_checkbox and active_with_contract_checkbox.is_selected():
+                    print("[NAV] Unchecking Active With Contract checkbox...")
+                    active_with_contract_checkbox.click()
+                    time.sleep(0.5)
+                    print("[NAV] ✓ Active With Contract unchecked")
+            except Exception as e:
+                print(f"[NAV] ⚠ Could not find/uncheck Active With Contract checkbox: {e}")
+                logger.warning(f"Could not find Active With Contract checkbox: {e}")
             
-            # Step 2: Check Closed (value="21507")
+            # Step 2: Check Closed (value="21507") - this one is required
             print("[NAV] Step 2: Checking Closed checkbox...")
             closed_checkbox = self._find_element_with_fallback([
                 (By.XPATH, "//input[@type='checkbox' and @value='21507' and @name='Fm11_Ctrl27_LB']"),
                 (By.XPATH, "//input[@type='checkbox' and @value='21507' and contains(@data-mtx-track, 'Closed')]"),
                 (By.CSS_SELECTOR, "input[value='21507'][name='Fm11_Ctrl27_LB']"),
+                (By.XPATH, "//input[@type='checkbox' and @value='21507']"),
             ])
             if not closed_checkbox.is_selected():
                 print("[NAV] Checking Closed checkbox...")

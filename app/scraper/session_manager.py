@@ -71,27 +71,59 @@ class SessionManager:
     #         raise SessionError(f"Failed to create WebDriver: {str(e)}")
 
     def create_driver(self):
-        options = Options()
-
-        # REQUIRED inside Docker
-        options.add_argument("--headless=new")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--disable-gpu")
-        options.add_argument("--window-size=1920,1080")
-
-        options.binary_location = "/usr/bin/chromium"
-
-        service = Service("/usr/bin/chromedriver")
-
-        driver = webdriver.Chrome(
-            service=service,
-            options=options
-        )
-
-        self.driver = driver
-        self.wait = WebDriverWait(driver, 30)  # Or your SELENIUM_TIMEOUT
-        return driver
+        """Create and configure Chrome WebDriver."""
+        try:
+            options = Options()
+            
+            if SELENIUM_HEADLESS:
+                options.add_argument("--headless=new")
+            
+            # REQUIRED for Docker/headless
+            options.add_argument("--no-sandbox")
+            options.add_argument("--disable-dev-shm-usage")
+            options.add_argument("--disable-gpu")
+            options.add_argument("--disable-blink-features=AutomationControlled")
+            options.add_experimental_option("excludeSwitches", ["enable-automation"])
+            options.add_experimental_option('useAutomationExtension', False)
+            
+            # Set window size
+            if SELENIUM_WINDOW_SIZE:
+                options.add_argument(f"--window-size={SELENIUM_WINDOW_SIZE}")
+            else:
+                options.add_argument("--window-size=1920,1080")
+            
+            # User agent to appear more like a real browser
+            options.add_argument(
+                "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            )
+            
+            # Try to use system chromium if available (for Docker)
+            try:
+                import os
+                if os.path.exists("/usr/bin/chromium"):
+                    options.binary_location = "/usr/bin/chromium"
+            except:
+                pass
+            
+            # Use ChromeDriverManager to automatically download and manage driver
+            service = Service(ChromeDriverManager().install())
+            driver = webdriver.Chrome(service=service, options=options)
+            
+            # Set timeouts
+            driver.implicitly_wait(10)
+            driver.set_page_load_timeout(SELENIUM_TIMEOUT)
+            
+            self.driver = driver
+            self.wait = WebDriverWait(driver, SELENIUM_TIMEOUT)
+            
+            logger.info("WebDriver created successfully")
+            return driver
+            
+        except Exception as e:
+            logger.error(f"Failed to create WebDriver: {str(e)}", exc_info=True)
+            raise SessionError(f"Failed to create WebDriver: {str(e)}")
 
     def close(self):
         """Close the WebDriver session."""

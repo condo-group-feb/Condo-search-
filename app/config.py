@@ -20,3 +20,5 @@ LOGIN_URL = os.getenv("LOGIN_URL", "https://miamirealtors.mysolidearth.com/authe
 # Login credentials (from .env)
 LOGIN_USERNAME = os.getenv("LOGIN_USERNAME", "")
 LOGIN_PASSWORD = os.getenv("LOGIN_PASSWORD", "")
+
+WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://zpsvatonxakysnbqnfcc.supabase.co/functions/v1/condo-search-webhook")
