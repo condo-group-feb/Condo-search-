@@ -108,7 +108,8 @@ class SessionManager:
                 pass
             
             # Use ChromeDriverManager to automatically download and manage driver
-            service = Service(ChromeDriverManager().install())
+            # service = Service(ChromeDriverManager().install())
+            service = Service("/usr/bin/chromedriver")
             driver = webdriver.Chrome(service=service, options=options)
             
             # Set timeouts
