@@ -1,6 +1,9 @@
 """Selenium WebDriver session management."""
 
 import logging
+import os
+import subprocess
+import time
 from contextlib import contextmanager
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -100,20 +103,47 @@ class SessionManager:
             )
             
             # Try to use system chromium if available (for Docker/Railway)
-            import os
             if os.path.exists("/usr/bin/chromium"):
                 options.binary_location = "/usr/bin/chromium"
             
-            # Try ChromeDriverManager first, fallback to system chromedriver for Railway
+            # Try ChromeDriverManager first, with retries and better error handling
             service = None
-            try:
-                # Try ChromeDriverManager (works in local, may fail on Railway due to network)
-                logger.info("Attempting to use ChromeDriverManager...")
-                service = Service(ChromeDriverManager().install())
-                logger.info("ChromeDriverManager installed successfully")
-            except Exception as wdm_error:
-                logger.warning(f"ChromeDriverManager failed: {wdm_error}, trying system chromedriver...")
-                # Fallback to system chromedriver (for Railway/Docker)
+            max_retries = 3
+            retry_count = 0
+            
+            # Set environment variables for ChromeDriverManager to use app directory for cache
+            # This ensures it works in Railway/Docker environments
+            cache_dir = os.path.join(os.getcwd(), ".wdm")
+            os.makedirs(cache_dir, exist_ok=True)
+            os.environ.setdefault("WDM_LOCAL", "1")  # Use local cache
+            
+            while retry_count < max_retries and service is None:
+                try:
+                    # Try ChromeDriverManager (works in local, may need retries on Railway)
+                    logger.info(f"Attempting to use ChromeDriverManager (attempt {retry_count + 1}/{max_retries})...")
+                    # Use cache_valid_range to avoid frequent downloads, increase timeout
+                    manager = ChromeDriverManager(cache_valid_range=30)  # Cache for 30 days
+                    driver_path = manager.install()
+                    service = Service(driver_path)
+                    logger.info(f"ChromeDriverManager installed successfully at: {driver_path}")
+                    break
+                except Exception as wdm_error:
+                    retry_count += 1
+                    error_msg = str(wdm_error)
+                    if retry_count < max_retries:
+                        logger.warning(f"ChromeDriverManager attempt {retry_count} failed: {error_msg}, retrying...")
+                        time.sleep(3)  # Wait longer before retry
+                    else:
+                        logger.error(f"ChromeDriverManager failed after {max_retries} attempts: {error_msg}")
+                        # Log more details for debugging
+                        if "network" in error_msg.lower() or "connection" in error_msg.lower():
+                            logger.error("Network issue detected. ChromeDriverManager needs internet access to download drivers.")
+                        elif "permission" in error_msg.lower() or "access" in error_msg.lower():
+                            logger.error("Permission issue detected. Check cache directory permissions.")
+            
+            # If ChromeDriverManager failed, try to use system chromedriver but warn about version mismatch
+            if service is None:
+                logger.warning("ChromeDriverManager failed, trying system chromedriver (may have version mismatch)...")
                 chromedriver_paths = [
                     "/usr/bin/chromedriver",
                     "/usr/local/bin/chromedriver",
@@ -128,17 +158,47 @@ class SessionManager:
                         break
                 
                 if chromedriver_path:
+                    # Try to get Chromium version to warn about mismatch
+                    try:
+                        result = subprocess.run(
+                            ["chromium", "--version"],
+                            capture_output=True,
+                            text=True,
+                            timeout=5
+                        )
+                        chromium_version = result.stdout.strip() if result.returncode == 0 else "unknown"
+                        logger.warning(f"Using system chromedriver. Chromium version: {chromium_version}")
+                        logger.warning("WARNING: System chromedriver may have version mismatch. ChromeDriverManager is preferred.")
+                    except Exception:
+                        pass
+                    
+                    # Try to use it, but it may fail due to version mismatch
+                    # In that case, we'll catch the error and provide better guidance
                     service = Service(chromedriver_path)
                 else:
                     raise SessionError(
-                        f"Could not find chromedriver. ChromeDriverManager failed: {wdm_error}, "
-                        f"and system chromedriver not found in: {chromedriver_paths}"
+                        f"Could not find chromedriver. ChromeDriverManager failed after {max_retries} attempts, "
+                        f"and system chromedriver not found in: {chromedriver_paths}. "
+                        f"Please ensure ChromeDriverManager can download drivers or install matching chromedriver."
                     )
 
-            driver = webdriver.Chrome(
-                service=service,
-                options=options
-            )
+            try:
+                driver = webdriver.Chrome(
+                    service=service,
+                    options=options
+                )
+            except Exception as driver_error:
+                error_str = str(driver_error)
+                # Check if it's a version mismatch error
+                if "version" in error_str.lower() and "chromedriver" in error_str.lower():
+                    logger.error(f"ChromeDriver version mismatch detected: {driver_error}")
+                    raise SessionError(
+                        f"ChromeDriver version mismatch. ChromeDriverManager failed to download matching driver. "
+                        f"Error: {driver_error}. "
+                        f"Please ensure ChromeDriverManager has network access on Railway to download the correct driver version."
+                    )
+                else:
+                    raise
             
             # Set timeouts
             driver.implicitly_wait(10)
@@ -150,6 +210,9 @@ class SessionManager:
             logger.info("WebDriver created successfully")
             return driver
             
+        except SessionError:
+            # Re-raise SessionError as-is
+            raise
         except Exception as e:
             logger.error(f"Failed to create WebDriver: {str(e)}", exc_info=True)
             raise SessionError(f"Failed to create WebDriver: {str(e)}")
