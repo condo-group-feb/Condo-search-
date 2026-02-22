@@ -516,8 +516,8 @@ class Navigator:
     def configure_search_filters(
         self, 
         street_number: str, 
-        street_direction: str, 
-        street_name: str
+        street_direction: str = None, 
+        street_name: str = None
     ) -> str:
         """
         Configure search filters on the RE1/RE2 page:
@@ -528,7 +528,7 @@ class Navigator:
         
         Args:
             street_number: Street number (e.g., "30", "90")
-            street_direction: Street direction (N, NE, E, SE, S, SW, W, NW)
+            street_direction: Street direction (N, NE, E, SE, S, SW, W, NW) - optional
             street_name: Street name (e.g., "3", "3rd")
         
         Returns:
@@ -549,15 +549,17 @@ class Navigator:
             "NW": "128"
         }
         
-        # Validate and map street direction
-        street_direction_upper = street_direction.upper().strip()
-        if street_direction_upper not in STREET_DIRECTION_MAP:
-            raise NavigationError(
-                f"Invalid street direction: {street_direction}. "
-                f"Must be one of: {', '.join(STREET_DIRECTION_MAP.keys())}"
-            )
-        
-        direction_value = STREET_DIRECTION_MAP[street_direction_upper]
+        # Validate and map street direction (only if provided)
+        direction_value = None
+        street_direction_upper = None
+        if street_direction:
+            street_direction_upper = street_direction.upper().strip()
+            if street_direction_upper not in STREET_DIRECTION_MAP:
+                raise NavigationError(
+                    f"Invalid street direction: {street_direction}. "
+                    f"Must be one of: {', '.join(STREET_DIRECTION_MAP.keys())}"
+                )
+            direction_value = STREET_DIRECTION_MAP[street_direction_upper]
         try:
             logger.info("Configuring search filters")
             print("[NAV] Configuring search filters...")
@@ -654,17 +656,20 @@ class Navigator:
             time.sleep(0.5)
             print("[NAV] ✓ Street Number filled")
             
-            # Select dropdown (Street Direction) - name="Fm11_Ctrl15_0_142"
-            street_direction_select = self._find_element_with_fallback([
-                (By.NAME, "Fm11_Ctrl15_0_142"),
-                (By.XPATH, "//select[@name='Fm11_Ctrl15_0_142']"),
-                (By.CSS_SELECTOR, "select[name='Fm11_Ctrl15_0_142']"),
-            ])
-            print(f"[NAV] Selecting Street Direction '{street_direction_upper}' (value={direction_value})...")
-            select = Select(street_direction_select)
-            select.select_by_value(direction_value)
-            time.sleep(0.5)
-            print("[NAV] ✓ Street Direction selected")
+            # Select dropdown (Street Direction) - name="Fm11_Ctrl15_0_142" - only if provided
+            if direction_value:
+                street_direction_select = self._find_element_with_fallback([
+                    (By.NAME, "Fm11_Ctrl15_0_142"),
+                    (By.XPATH, "//select[@name='Fm11_Ctrl15_0_142']"),
+                    (By.CSS_SELECTOR, "select[name='Fm11_Ctrl15_0_142']"),
+                ])
+                print(f"[NAV] Selecting Street Direction '{street_direction_upper}' (value={direction_value})...")
+                select = Select(street_direction_select)
+                select.select_by_value(direction_value)
+                time.sleep(0.5)
+                print("[NAV] ✓ Street Direction selected")
+            else:
+                print("[NAV] ⚠ Street Direction not provided, skipping selection")
             
             # Fill second input (Street Name) - id="Fm11_Ctrl15_0_144"
             street_name_input = self._find_element_with_fallback([
@@ -771,7 +776,7 @@ class Navigator:
         except Exception as e:
             logger.error(f"Form configuration error: {str(e)}")
             raise NavigationError(f"Failed to configure search filters: {str(e)}")
-    
+        
     def _find_element_with_fallback(self, selectors: list, timeout: int = None):
         """
         Try multiple selectors to find an element.
@@ -1258,50 +1263,92 @@ class Navigator:
                 print("[NAV] ⚠ Not enough rows in mortgage history table")
                 return None
             
-            # Extract first 3 rows
-            mortgage_dates = []
-            mortgage_amounts = []
-            mortgage_lenders = []
+            # Extract only first column (latest mortgage) from first 3 rows
+            mortgage_date = None
+            mortgage_amount = None
+            mortgage_lender = None
             
-            # Row 1: Mortgage Date
+            # Row 1: Mortgage Date - get first data column (index 1)
             date_row = rows[0]
             date_cells = date_row.find_elements(By.TAG_NAME, "td")
-            for cell in date_cells[1:]:  # Skip first cell (header)
-                text = cell.text.strip()
+            if len(date_cells) > 1:  # Check if we have at least header + 1 data column
+                text = date_cells[1].text.strip()
                 if text and text != "Mortgage Date":
-                    mortgage_dates.append(text)
+                    mortgage_date = text
             
-            # Row 2: Mortgage Amount
+            # Row 2: Mortgage Amount - get first data column (index 1)
             amount_row = rows[1]
             amount_cells = amount_row.find_elements(By.TAG_NAME, "td")
-            for cell in amount_cells[1:]:  # Skip first cell (header)
-                text = cell.text.strip()
+            if len(amount_cells) > 1:  # Check if we have at least header + 1 data column
+                text = amount_cells[1].text.strip()
                 if text and text != "Mortgage Amount":
-                    mortgage_amounts.append(text)
+                    mortgage_amount = text
             
-            # Row 3: Mortgage Lender
+            # Row 3: Mortgage Lender - get first data column (index 1)
             lender_row = rows[2]
             lender_cells = lender_row.find_elements(By.TAG_NAME, "td")
-            for cell in lender_cells[1:]:  # Skip first cell (header)
-                text = cell.text.strip()
+            if len(lender_cells) > 1:  # Check if we have at least header + 1 data column
+                text = lender_cells[1].text.strip()
                 if text and text != "Mortgage Lender":
-                    mortgage_lenders.append(text)
+                    mortgage_lender = text
             
-            # Build result dictionary - ensure we have data
-            if not mortgage_dates and not mortgage_amounts and not mortgage_lenders:
+            # Extract Sale Price from the span element (directly contains the price number)
+            sale_price = None
+            try:
+                sale_price_element = self.driver.find_element(
+                    By.XPATH,
+                    "/html/body/rlst-root/rlst-reports/mat-sidenav-container/mat-sidenav-content/div/main/rlst-property-details-report/rlst-base-report/article/div/rlst-property-details-body/section/div/div/div[4]/span"
+                )
+                sale_price = sale_price_element.text.strip()
+                if sale_price:
+                    print(f"[NAV] ✓ Extracted Sale Price: {sale_price}")
+            except Exception as e:
+                print(f"[NAV] ⚠ Could not extract Sale Price: {str(e)}")
+                # Try alternative selectors if the exact XPath doesn't work
+                try:
+                    # Try to find sale price span by looking for common patterns
+                    sale_price_selectors = [
+                        (By.XPATH, "//div[contains(@class, 'summary-section-item')]//span[contains(@class, 'value-cell')]"),
+                        (By.XPATH, "//p[contains(text(), 'Sale Price')]/following-sibling::span"),
+                        (By.XPATH, "//span[contains(@class, 'value-cell') and contains(text(), '$')]"),
+                    ]
+                    for by, selector in sale_price_selectors:
+                        try:
+                            element = self.driver.find_element(by, selector)
+                            text = element.text.strip()
+                            if text and '$' in text:
+                                sale_price = text
+                                print(f"[NAV] ✓ Extracted Sale Price (fallback): {sale_price}")
+                                break
+                        except:
+                            continue
+                except:
+                    pass
+            
+            # Build result dictionary - ensure we have at least some data
+            if not mortgage_date and not mortgage_amount and not mortgage_lender:
                 print("[NAV] ⚠ No mortgage data extracted from table")
+                # Still return sale_price if available
+                if sale_price:
+                    return {"sale_price": sale_price}
                 return None
             
             result = {
-                "mortgage_dates": mortgage_dates,
-                "mortgage_amounts": mortgage_amounts,
-                "mortgage_lenders": mortgage_lenders
+                "mortgage_date": mortgage_date,
+                "mortgage_amount": mortgage_amount,
+                "mortgage_lender": mortgage_lender
             }
             
-            print(f"[NAV] Extracted {len(mortgage_dates)} mortgage records")
-            print(f"[NAV] Dates: {mortgage_dates}")
-            print(f"[NAV] Amounts: {mortgage_amounts}")
-            print(f"[NAV] Lenders: {mortgage_lenders}")
+            # Add sale_price as separate key if available
+            if sale_price:
+                result["sale_price"] = sale_price
+            
+            print(f"[NAV] Extracted latest mortgage record:")
+            print(f"[NAV] Date: {mortgage_date}")
+            print(f"[NAV] Amount: {mortgage_amount}")
+            print(f"[NAV] Lender: {mortgage_lender}")
+            if sale_price:
+                print(f"[NAV] Sale Price: {sale_price}")
             return result
             
         except TimeoutException:
@@ -1310,4 +1357,3 @@ class Navigator:
         except Exception as e:
             print(f"[NAV] ⚠ Error extracting mortgage history: {str(e)}")
             return None
-

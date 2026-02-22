@@ -13,9 +13,9 @@ class LoginRequest(BaseModel):
 class SearchFiltersRequest(BaseModel):
     """Request model for search filters."""
     street_number: str = Field(..., description="Street number (e.g., '30', '90')")
-    street_direction: str = Field(..., description="Street direction: N, NE, E, SE, S, SW, W, NW")
+    street_direction: Optional[str] = Field(None, description="Street direction: N, NE, E, SE, S, SW, W, NW (optional)")
     street_name: str = Field(..., description="Street name (e.g., '3', '3rd')")
-    webhook_url: str = Field(..., description="URL to POST results back to")
+    webhook_url: Optional[str] = Field(None, description="URL to POST results back to (optional, will use WEBHOOK_URL from .env if not provided)")
     search_id: Optional[str] = Field(None, description="Search ID from database (if provided, will be used instead of generating new one)")
 
 
