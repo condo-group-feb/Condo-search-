@@ -121,9 +121,8 @@ class SessionManager:
                 try:
                     # Try ChromeDriverManager (works in local, may need retries on Railway)
                     logger.info(f"Attempting to use ChromeDriverManager (attempt {retry_count + 1}/{max_retries})...")
-                    # Use cache_valid_range to avoid frequent downloads, increase timeout
-                    manager = ChromeDriverManager(cache_valid_range=30)  # Cache for 30 days
-                    driver_path = manager.install()
+                    # ChromeDriverManager will automatically download and cache the driver
+                    driver_path = ChromeDriverManager().install()
                     service = Service(driver_path)
                     logger.info(f"ChromeDriverManager installed successfully at: {driver_path}")
                     break

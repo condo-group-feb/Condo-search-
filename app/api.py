@@ -410,45 +410,45 @@ def transform_mortgage_data_to_webhook_format(mortgage_data: dict) -> list:
     for ml_number, data in mortgage_data.items():
         if data is None:
             continue
+        
+        # Check if data is in new format (singular fields) or old format (arrays)
+        # New format: {"mortgage_date": "...", "mortgage_amount": "...", "mortgage_lender": "...", "sale_price": "..."}
+        # Old format: {"mortgage_dates": [...], "mortgage_amounts": [...], "mortgage_lenders": [...]}
+        
+        if "mortgage_date" in data or "mortgage_amount" in data or "mortgage_lender" in data:
+            # New format: singular fields
+            mortgage_date = data.get("mortgage_date")
+            mortgage_amount = data.get("mortgage_amount")
+            mortgage_lender = data.get("mortgage_lender")
+            sale_price = data.get("sale_price")
             
-        # Extract arrays from mortgage data
-        mortgage_dates = data.get("mortgage_dates", [])
-        mortgage_amounts = data.get("mortgage_amounts", [])
-        mortgage_lenders = data.get("mortgage_lenders", [])
-        
-        # Create one result per mortgage record
-        max_len = max(
-            len(mortgage_dates) if mortgage_dates else 0,
-            len(mortgage_amounts) if mortgage_amounts else 0,
-            len(mortgage_lenders) if mortgage_lenders else 0
-        )
-        
-        if max_len == 0:
-            continue
-        
-        for i in range(max_len):
             # Parse close_date to YYYY-MM-DD format
             close_date = None
-            if i < len(mortgage_dates) and mortgage_dates[i]:
-                close_date = parse_date(mortgage_dates[i])
+            if mortgage_date:
+                close_date = parse_date(mortgage_date)
             
             # Parse mortgage_amount to integer
-            mortgage_amount = 0
-            if i < len(mortgage_amounts) and mortgage_amounts[i]:
-                mortgage_amount = parse_amount(mortgage_amounts[i])
+            parsed_mortgage_amount = 0
+            if mortgage_amount:
+                parsed_mortgage_amount = parse_amount(mortgage_amount)
+            
+            # Parse sold_price to integer
+            parsed_sold_price = 0
+            if sale_price:
+                parsed_sold_price = parse_amount(sale_price)
             
             # Get lender_name
             lender_name = None
-            if i < len(mortgage_lenders) and mortgage_lenders[i]:
-                lender_name = str(mortgage_lenders[i]).strip()
+            if mortgage_lender:
+                lender_name = str(mortgage_lender).strip()
             
             # Only create result if we have at least close_date or mortgage_amount
-            if close_date or mortgage_amount > 0:
+            if close_date or parsed_mortgage_amount > 0:
                 result = {
                     "unit": str(ml_number),  # ML# used as unit identifier
                     "close_date": close_date if close_date else None,  # Date in YYYY-MM-DD format or None
-                    "sold_price": 0,  # Not available in current data - set to 0
-                    "mortgage_amount": mortgage_amount,  # Integer, default to 0
+                    "sold_price": parsed_sold_price,  # Use extracted sale_price
+                    "mortgage_amount": parsed_mortgage_amount,  # Integer, default to 0
                     "lender_name": lender_name if lender_name else None,  # Lender name or None
                     "loan_type": "Conventional"  # Default value - adjust if loan type is available
                 }
@@ -457,5 +457,52 @@ def transform_mortgage_data_to_webhook_format(mortgage_data: dict) -> list:
                 result = {k: v for k, v in result.items() if v is not None}
                 
                 results.append(result)
+        else:
+            # Old format: arrays (for backward compatibility)
+            mortgage_dates = data.get("mortgage_dates", [])
+            mortgage_amounts = data.get("mortgage_amounts", [])
+            mortgage_lenders = data.get("mortgage_lenders", [])
+            
+            # Create one result per mortgage record
+            max_len = max(
+                len(mortgage_dates) if mortgage_dates else 0,
+                len(mortgage_amounts) if mortgage_amounts else 0,
+                len(mortgage_lenders) if mortgage_lenders else 0
+            )
+            
+            if max_len == 0:
+                continue
+            
+            for i in range(max_len):
+                # Parse close_date to YYYY-MM-DD format
+                close_date = None
+                if i < len(mortgage_dates) and mortgage_dates[i]:
+                    close_date = parse_date(mortgage_dates[i])
+                
+                # Parse mortgage_amount to integer
+                mortgage_amount = 0
+                if i < len(mortgage_amounts) and mortgage_amounts[i]:
+                    mortgage_amount = parse_amount(mortgage_amounts[i])
+                
+                # Get lender_name
+                lender_name = None
+                if i < len(mortgage_lenders) and mortgage_lenders[i]:
+                    lender_name = str(mortgage_lenders[i]).strip()
+                
+                # Only create result if we have at least close_date or mortgage_amount
+                if close_date or mortgage_amount > 0:
+                    result = {
+                        "unit": str(ml_number),  # ML# used as unit identifier
+                        "close_date": close_date if close_date else None,  # Date in YYYY-MM-DD format or None
+                        "sold_price": 0,  # Not available in old format
+                        "mortgage_amount": mortgage_amount,  # Integer, default to 0
+                        "lender_name": lender_name if lender_name else None,  # Lender name or None
+                        "loan_type": "Conventional"  # Default value
+                    }
+                    
+                    # Remove None values to keep payload clean
+                    result = {k: v for k, v in result.items() if v is not None}
+                    
+                    results.append(result)
     
     return results
